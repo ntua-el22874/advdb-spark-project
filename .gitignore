@@ -1,0 +1,15 @@
+# Δεδομένα - ΠΟΤΕ δεν ανεβαίνουν στο Git!
+raw/
+parquet/
+*.json
+*.csv
+*.txt
+*.tar
+*.zip
+
+# Spark logs & προσωρινά
+spark-warehouse/
+event_logs/
+*.log
+__pycache__/
+.DS_Store
