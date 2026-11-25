@@ -1,4 +1,4 @@
-import os
+from config import PARQUET_DIR, RAW_DIR
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
     StructType, StructField, StringType, FloatType,
@@ -9,8 +9,6 @@ spark = SparkSession.builder \
     .appName("Convert Business and User to Parquet") \
     .config("spark.sql.session.timeZone", "UTC") \
     .getOrCreate()
-
-home_dir = os.path.expanduser("~")
 
 print("\n--- 1. Μετατροπή Business Dataset σε Parquet ---")
 
@@ -29,8 +27,8 @@ business_schema = StructType([
     StructField("categories", StringType(), True)
 ])
 
-input_business_json = os.path.join(home_dir, "advdb/raw/yelp_academic_dataset_business.json")
-output_business_parquet = os.path.join(home_dir, "advdb/parquet/business")
+input_business_json = str(RAW_DIR / "yelp_academic_dataset_business.json")
+output_business_parquet = str(PARQUET_DIR / "business")
 
 df_business = spark.read.schema(business_schema).json(input_business_json)
 
@@ -54,8 +52,8 @@ user_schema = StructType([
     StructField("average_stars", FloatType(), True)
 ])
 
-input_user_json = os.path.join(home_dir, "advdb/raw/yelp_academic_dataset_user.json")
-output_user_parquet = os.path.join(home_dir, "advdb/parquet/users")
+input_user_json = str(RAW_DIR / "yelp_academic_dataset_user.json")
+output_user_parquet = str(PARQUET_DIR / "users")
 
 df_user = spark.read.schema(user_schema).json(input_user_json)
 

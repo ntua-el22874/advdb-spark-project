@@ -1,4 +1,4 @@
-import os
+from config import PARQUET_DIR
 import time
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
@@ -8,8 +8,7 @@ spark = SparkSession.builder \
     .config("spark.sql.session.timeZone", "UTC") \
     .getOrCreate()
 
-home_dir = os.path.expanduser("~")
-parquet_path = os.path.join(home_dir, "advdb/parquet/reviews")
+parquet_path = str(PARQUET_DIR / "reviews")
 
 df_reviews = spark.read.parquet(parquet_path)
 

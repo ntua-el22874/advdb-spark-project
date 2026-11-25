@@ -1,4 +1,4 @@
-import os
+from config import PARQUET_DIR, RAW_DIR
 import time
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
@@ -12,9 +12,8 @@ spark = SparkSession.builder \
     .config("spark.sql.session.timeZone", "UTC") \
     .getOrCreate()
 
-home_dir = os.path.expanduser("~")
-json_path = os.path.join(home_dir, "advdb/raw/yelp_academic_dataset_review.json")
-parquet_path = os.path.join(home_dir, "advdb/parquet/reviews")
+json_path = str(RAW_DIR / "yelp_academic_dataset_review.json")
+parquet_path = str(PARQUET_DIR / "reviews")
 
 review_schema = StructType([
     StructField("review_id", StringType(), False),

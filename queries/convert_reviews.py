@@ -1,4 +1,4 @@
-import os
+from config import PARQUET_DIR, RAW_DIR
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, FloatType, IntegerType, TimestampType
 import pyspark.sql.functions as F
@@ -20,9 +20,8 @@ review_schema = StructType([
     StructField("date", TimestampType(), False)
 ])
 
-home_dir = os.path.expanduser("~")
-input_json = os.path.join(home_dir, "advdb/raw/yelp_academic_dataset_review.json")
-output_parquet = os.path.join(home_dir, "advdb/parquet/reviews")
+input_json = str(RAW_DIR / "yelp_academic_dataset_review.json")
+output_parquet = str(PARQUET_DIR / "reviews")
 
 df_raw = spark.read.schema(review_schema).json(input_json)
 
