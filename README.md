@@ -70,6 +70,46 @@ absolute path as `ADVDB_RUN_DIR`. Query scripts can use
 plan captured from `df.explain(mode="formatted")`. Choose an outside-repository
 directory or a path under `results/` when overriding the results root.
 
+## Q0 benchmark
+
+Stage the three Yelp JSON Lines files, `glove.6B.100d.txt`, and `acs_zcta.csv`
+under `$ADVDB_DATA_DIR/raw`. Assignment page 3 gives 150,346 business records,
+6,990,280 review records and 400,000 GloVe vectors. Check them with `wc -l`,
+allowing the assignment's ±1 tolerance for a missing final newline.
+
+```bash
+wc -l "$ADVDB_DATA_DIR"/raw/yelp_academic_dataset_{business,review,user}.json \
+    "$ADVDB_DATA_DIR"/raw/{glove.6B.100d.txt,acs_zcta.csv}
+
+bash scripts/run.sh convert-reviews 1 queries/convert_reviews.py
+bash scripts/run.sh convert-business-user 1 queries/convert_business_user.py
+bash scripts/run.sh convert-acs 1 queries/convert_auxiliary.py acs
+bash scripts/run.sh convert-glove 1 queries/convert_auxiliary.py glove
+```
+
+Verify the Parquet record counts against the inputs and check the schemas and
+review year partitions before benchmarking. Compare allocated disk space in KiB
+for the corresponding Yelp inputs and outputs.
+
+```bash
+du -sk "$ADVDB_DATA_DIR"/raw/yelp_academic_dataset_{business,review,user}.json \
+    "$ADVDB_DATA_DIR"/parquet/{business,reviews,users}
+
+for source in json-inferred json-explicit parquet; do
+    bash scripts/run.sh "q0-$source" 3 queries/benchmark_q0.py "$source"
+done
+```
+
+Keep the cluster settings the same for all three variants. Each application
+writes a `*.rows.json`, a `*.plan.txt` and a `*.metrics.json` in its run
+directory. Check that the year keys and average stars agree within floating-point
+tolerance. Report the median and min–max of `action_seconds`, which times the
+final `collect()`. Report `setup_seconds` separately to show the read and query
+setup cost, including JSON schema inference. `total_seconds` is the sum of the
+two. The metrics include the application ID and event-log directory. Use the
+application's stages in the History Server to report task counts. The jobs are
+tagged `q0-setup` and `q0-collect` in the event log.
+
 ## Stop Spark
 
 ```bash

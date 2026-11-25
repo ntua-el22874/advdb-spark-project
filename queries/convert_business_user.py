@@ -1,5 +1,5 @@
 from config import PARQUET_DIR, RAW_DIR
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, functions as F
 from pyspark.sql.types import (
     StructType, StructField, StringType, FloatType,
     IntegerType, DoubleType, TimestampType
@@ -24,13 +24,19 @@ business_schema = StructType([
     StructField("stars", FloatType(), True),
     StructField("review_count", IntegerType(), True),
     StructField("is_open", IntegerType(), True),
-    StructField("categories", StringType(), True)
+    StructField("categories", StringType(), True),
+    StructField("attributes", StringType(), True),
+    StructField("hours", StringType(), True)
 ])
 
 input_business_json = str(RAW_DIR / "yelp_academic_dataset_business.json")
 output_business_parquet = str(PARQUET_DIR / "business")
 
-df_business = spark.read.schema(business_schema).json(input_business_json)
+df_business = (
+    spark.read.schema(business_schema).json(input_business_json)
+    .withColumn("attributes", F.parse_json("attributes"))
+    .withColumn("hours", F.parse_json("hours"))
+)
 
 df_business.write \
     .mode("overwrite") \
@@ -49,7 +55,9 @@ user_schema = StructType([
     StructField("funny", IntegerType(), True),
     StructField("cool", IntegerType(), True),
     StructField("fans", IntegerType(), True),
-    StructField("average_stars", FloatType(), True)
+    StructField("average_stars", FloatType(), True),
+    StructField("elite", StringType(), True),
+    StructField("friends", StringType(), True)
 ])
 
 input_user_json = str(RAW_DIR / "yelp_academic_dataset_user.json")
