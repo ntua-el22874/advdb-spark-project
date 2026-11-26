@@ -44,7 +44,7 @@ Put source files under `$ADVDB_DATA_DIR/raw`. Converters write to
 
 ```bash
 bash scripts/run.sh convert-reviews 1 queries/convert_reviews.py
-bash scripts/run.sh q1 3 queries/query1.py
+bash scripts/run.sh q1-dataframe 1 queries/query1.py --api dataframe
 ```
 
 The runner accepts `LABEL REPEATS PYTHON_SCRIPT [SCRIPT_ARGS...]` and starts one
@@ -109,6 +109,78 @@ setup cost, including JSON schema inference. `total_seconds` is the sum of the
 two. The metrics include the application ID and event-log directory. Use the
 application's stages in the History Server to report task counts. The jobs are
 tagged `q0-setup` and `q0-collect` in the event log.
+
+## Q1A correctness checks
+
+Q1 selects reviews from 2015 through 2021 with at least one useful vote.
+Both parts exclude null text because its length is unknown. In Q1(b) the
+denominator is the number of reviews in that year meeting the year and
+useful-vote filters and having non-null text. An empty string counts as a
+Short review of length zero. A category with no reviews in a given year
+has no row for that year.
+
+Use a temporary data root for the fixture. The normal review converter
+writes its Parquet input for both APIs.
+
+```bash
+(
+    export ADVDB_DATA_DIR="$(mktemp -d)"
+    python3 scripts/verify_q1.py fixture "$ADVDB_DATA_DIR"
+    bash scripts/run.sh q1-fixture-convert 1 queries/convert_reviews.py
+    bash scripts/run.sh q1-fixture-dataframe 1 queries/query1.py --api dataframe --audit
+    bash scripts/run.sh q1-fixture-sql 1 queries/query1.py --api sql
+)
+
+bash scripts/run.sh q1-full-dataframe 1 queries/query1.py --api dataframe --audit
+bash scripts/run.sh q1-full-sql 1 queries/query1.py --api sql
+```
+
+Set the four directory variables below to the corresponding `repeat-1`
+directories printed by the runner.
+
+```bash
+python3 scripts/verify_q1.py check "$fixture_dataframe_dir" "$fixture_sql_dir" --fixture
+python3 scripts/verify_q1.py check "$full_dataframe_dir" "$full_sql_dir"
+```
+
+Each run writes `q1-a` and `q1-b` rows, formatted physical plans, and metrics
+with the Spark application ID. With `--audit`, a separate action after
+Q1(b) writes `q1-eligibility.rows.json` with yearly counts before the text
+filter and the number of those reviews with null text. The verifier checks
+the fixture against hand-calculated results, compares the APIs, and
+reconciles category counts and yearly percentage sums with the audit.
+
+## Q1B cache and timing
+
+With the same standalone cluster and full review Parquet used for Q1A, run
+three fresh applications per API and cache setting. The runner defaults give
+four one-core executors with 2 GiB each and a 2 GiB driver.
+
+```bash
+export EXECUTOR_CORES=1 EXECUTOR_MEMORY=2g TOTAL_EXECUTOR_CORES=4 DRIVER_MEMORY=2g
+for api in dataframe sql; do
+    for cache in none filtered; do
+        bash scripts/run.sh "q1-$api-$cache" 3 queries/query1.py --api "$api" --cache "$cache"
+    done
+done
+bash scripts/run.sh q1-full-cache 1 queries/query1.py --api dataframe --cache full
+
+du -sc -B1 "$ADVDB_DATA_DIR"/parquet/reviews/year={2015..2021}
+```
+
+Filtered mode caches the filtered projection of `year`, `stars`, `useful`
+and `text` before computing categories. Q1(a) fills the cache as part of
+its timed action. Q1(b) then reads from the same cache. Each action has its
+own `action_seconds`, and `q1-sequence.metrics.json` records the sum.
+Plan capture, file writes, Storage inspection and the optional eligibility
+audit happen after both actions.
+
+The full-cache application is a separate diagnostic. It caches the entire
+input schema and materializes it with a review count and total text length.
+In both cache modes, `storage.json` captures the live Spark Storage API
+before unpersisting. Compare the filtered cache with the allocated size
+of the original 2015–2021 Parquet directories, which contain all reviews
+and columns in those years.
 
 ## Stop Spark
 
